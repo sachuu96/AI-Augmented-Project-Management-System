@@ -1,0 +1,128 @@
+openapi: 3.0.3
+info:
+  title: Product Management API
+  version: 1.0.0
+servers:
+  - url: http://localhost:3000
+components:
+  parameters:
+    SellerIdHeader:
+      name: X-Seller-Id
+      in: header
+      required: true
+      schema: { type: string }
+      description: Simulated Auth — only access your own products.
+  schemas:
+    Product:
+      type: object
+      required: [id, sellerId, name, price, quantity, category, createdAt, updatedAt]
+      properties:
+        id: { type: string, format: uuid }
+        sellerId: { type: string }
+        name: { type: string }
+        description: { type: string }
+        price: { type: number }
+        quantity: { type: integer }
+        category: { type: string }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+    CreateProductInput:
+      type: object
+      required: [name, price, quantity, category]
+      properties:
+        name: { type: string, minLength: 1 }
+        description: { type: string }
+        price: { type: number, minimum: 0 }
+        quantity: { type: integer, minimum: 0 }
+        category: { type: string }
+    UpdateProductInput:
+      type: object
+      properties:
+        name: { type: string }
+        description: { type: string }
+        price: { type: number, minimum: 0 }
+        quantity: { type: integer, minimum: 0 }
+        category: { type: string }
+    Error:
+      type: object
+      required: [message]
+      properties:
+        message: { type: string }
+paths:
+  /products:
+    get:
+      summary: List products for the seller
+      parameters: [ { $ref: "#/components/parameters/SellerIdHeader" } ]
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Product" }
+    post:
+      summary: Create product (emits ProductCreated)
+      parameters: [ { $ref: "#/components/parameters/SellerIdHeader" } ]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CreateProductInput" }
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Product" }
+        "400": { description: Bad Request, content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } } }
+  /products/{id}:
+    put:
+      summary: Update product (emits ProductUpdated and possible LowStockWarning)
+      parameters:
+        - { $ref: "#/components/parameters/SellerIdHeader" }
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/UpdateProductInput" }
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/Product" } } } }
+        "404": { description: Not Found }
+    delete:
+      summary: Delete product (emits ProductDeleted)
+      parameters:
+        - { $ref: "#/components/parameters/SellerIdHeader" }
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "204": { description: No Content }
+  /products/export:
+    get:
+      summary: Stream CSV export of seller’s products
+      parameters: [ { $ref: "#/components/parameters/SellerIdHeader" } ]
+      responses:
+        "200":
+          description: text/csv streamed
+  /products/import:
+    post:
+      summary: Stream CSV import (name,description,price,quantity,category)
+      parameters: [ { $ref: "#/components/parameters/SellerIdHeader" } ]
+      requestBody:
+        required: true
+        content:
+          text/csv: {}
+      responses:
+        "202": { description: Accepted, import processed in-stream }
+  /events/stream:
+    get:
+      summary: Server-Sent Events stream for low-stock alerts
+      responses:
+        "200":
+          description: text/event-stream
