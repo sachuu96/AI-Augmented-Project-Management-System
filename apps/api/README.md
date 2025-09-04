@@ -8,3 +8,7 @@ run seed file
 request validation 
 `npm install zod`
 `npm install --save-dev @types/express`
+
+for kafka integration
+`npm install kafkajs`
+`npm install --save-dev @types/node`
