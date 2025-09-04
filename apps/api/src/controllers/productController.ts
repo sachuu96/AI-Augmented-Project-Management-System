@@ -86,8 +86,8 @@ export const ProductController = {
     const updatedProduct = await ProductService.update(productId, {
       name,
       description,
-      price,
-      quantity,
+      price: parseFloat(price),
+      quantity: parseInt(quantity),
       category,
     });
 

@@ -11,9 +11,6 @@ services:
     image: docker.redpanda.com/redpandadata/redpanda:v24.1.10
     command: ["redpanda","start","--overprovisioned","--smp","1","--reserve-memory","0M","--check=false"]
     ports: ["9092:9092","9644:9644"]
-  dynamodb:
-    image: amazon/dynamodb-local
-    ports: ["8000:8000"]
   minio:
     image: minio/minio
     command: server /data --console-address ":9001"
@@ -21,19 +18,31 @@ services:
       MINIO_ROOT_USER: minio
       MINIO_ROOT_PASSWORD: minio123
     ports: ["9000:9000","9001:9001"]
-  web:
-    build: ./apps/web
-    environment:
-      VITE_API_URL: http://localhost:3000
-      VITE_SSE_URL: http://localhost:3001/events/stream
-    ports: ["5173:5173"]
-  api:
-    build: ./apps/api
-    environment:
-      DATABASE_URL: postgresql://postgres:password@localhost:5432/app?schema=public
-      # KAFKA_BROKERS: redpanda:9092
-      # LOW_STOCK_THRESHOLD: "5"
-    depends_on: [postgres]
-    ports: ["3000:3000"]
+  # web:
+  #   build: ./apps/web
+  #   environment:
+  #     VITE_API_URL: http://localhost:3000
+  #     VITE_SSE_URL: http://localhost:3001/events/stream
+  #   ports: ["5173:5173"]
+  # api:
+  #   build: ./apps/api
+  #   environment:
+  #     DATABASE_URL: postgresql://postgres:password@localhost:5432/app?schema=public
+  #     # KAFKA_BROKERS: redpanda:9092
+  #     # LOW_STOCK_THRESHOLD: "5"
+  #   depends_on: [postgres]
+  #   ports: ["3000:3000"]
+  sqs:
+    image: softwaremill/elasticmq:1.4.5
+    ports:
+      - "9324:9324" # API
+      - "9325:9325" # UI
+    # default config creates queues dynamically via CreateQueue
+
+  dynamodb:
+    image: amazon/dynamodb-local:2.4.0
+    command: -jar DynamoDBLocal.jar -sharedDb -inMemory
+    ports:
+      - "8000:8000"
   
 
