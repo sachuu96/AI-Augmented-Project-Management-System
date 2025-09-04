@@ -48,6 +48,7 @@ async function handleResponse(res: Response) {
 
 export async function getProducts(): Promise<Product[]> {
   const res = await fetch(`${BASE_URL}/products`, {
+    method: "GET",
     headers: {
       ...sellerHeader(),
       Accept: "application/json",

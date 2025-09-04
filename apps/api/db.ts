@@ -1,4 +1,4 @@
-import { Pool } from "pg";
+import { Pool, QueryResult } from "pg";
 
 export const pool = new Pool({
   user: process.env.DB_USER || "postgres",
@@ -8,7 +8,10 @@ export const pool = new Pool({
   port: Number(process.env.DB_PORT || 5432),
 });
 
-export async function query(text, params) {
+export async function query(
+  text: string,
+  params?: any[]
+): Promise<QueryResult> {
   const client = await pool.connect();
   try {
     const res = await client.query(text, params);

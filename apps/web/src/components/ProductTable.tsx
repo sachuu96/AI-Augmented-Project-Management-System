@@ -30,7 +30,7 @@ export default function ProductTable({ products, onEdit, onDelete, loading }: Pr
         {products.map(p => (
           <tr key={p.id} style={{ borderTop: '1px solid #eee' }}>
             <td style={td}>{p.name}</td>
-            <td style={td}>{p.price.toFixed(2)}</td>
+            <td style={td}>{p.price}</td>
             <td style={td}>{p.quantity}</td>
             <td style={td}>{p.category}</td>
             <td style={td}>

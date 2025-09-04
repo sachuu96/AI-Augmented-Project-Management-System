@@ -7,37 +7,40 @@ import {
   ProductUpdated,
   LawStockWarning,
 } from "../../../../packages/event-schemas/types";
+import { v4 as uuidv4 } from "uuid";
 
 export const ProductController = {
-  getAll: (req: Request, res: Response) => {
-    res.json(ProductService.getAll());
+  getAll: async (req: Request, res: Response) => {
+    const products = await ProductService.getAll();
+    res.status(200).send(products);
   },
 
-  getById: (req: Request, res: Response) => {
+  getById: async (req: Request, res: Response) => {
     const { id } = req.params;
 
     if (!id) {
       return res.status(400).json({ error: "Product ID is required" });
     }
 
-    const product = ProductService.getById(id);
+    const product = await ProductService.getById(id);
     if (!product) return res.status(404).json({ error: "Product not found" });
 
-    res.json(product);
+    res.status(200).send(product);
   },
 
   create: async (req: Request, res: Response) => {
     const { name, description = null, price, quantity, category } = req.body;
-    const sellerId = (req as any).sellerId!;
-    const id = Date.now().toString();
+    const seller_id = (req as any).sellerId!;
+    const id = uuidv4();
 
-    const product = ProductService.create({
+    const product = await ProductService.create({
       id,
       name,
       description,
       price,
       quantity,
       category,
+      seller_id,
     });
 
     // Cast product to schema type
@@ -45,7 +48,7 @@ export const ProductController = {
       type: "ProductCreated",
       version: "1",
       occurredAt: new Date().toISOString(),
-      sellerId,
+      sellerId:seller_id,
       product: product as unknown as ProductCreated["product"],
     };
 
@@ -56,7 +59,7 @@ export const ProductController = {
         type: "LowStockWarning",
         version: "1",
         occurredAt: new Date().toISOString(),
-        sellerId,
+        sellerId: seller_id,
         productId: id,
         quantity,
         threshold: 10,
@@ -64,7 +67,7 @@ export const ProductController = {
       publishEvent("LowStockWarning", warning).catch(console.error);
     }
 
-    res.status(201).json(product);
+    res.status(201).send(product);
   },
 
   update: async (req: Request, res: Response) => {
@@ -76,11 +79,11 @@ export const ProductController = {
       return res.status(400).json({ error: "Product ID is required" });
     }
 
-    const existingProduct = ProductService.getById(productId);
+    const existingProduct = await ProductService.getById(productId);
     if (!existingProduct)
       return res.status(404).json({ error: "Product not found" });
 
-    const updatedProduct = ProductService.update(productId, {
+    const updatedProduct = await ProductService.update(productId, {
       name,
       description,
       price,
@@ -94,11 +97,11 @@ export const ProductController = {
       occurredAt: new Date().toISOString(),
       sellerId,
       product: !updatedProduct as unknown as ProductUpdated["product"],
-      changes : req.body,
+      changes: req.body,
     };
 
     publishEvent("ProductUpdated", event).catch(console.error);
-    res.json(updatedProduct);
+    res.status(200).send(updatedProduct);
   },
 
   delete: async (req: Request, res: Response) => {
@@ -109,7 +112,7 @@ export const ProductController = {
       return res.status(400).json({ error: "Product ID is required" });
     }
 
-    const deleted = ProductService.delete(productId);
+    const deleted = await ProductService.delete(productId);
     if (!deleted) return res.status(404).json({ error: "Product not found" });
 
     const event: ProductDeleted = {
@@ -121,6 +124,6 @@ export const ProductController = {
     };
 
     publishEvent("ProductDeleted", event).catch(console.error);
-    res.json(deleted);
+    res.status(204).send(deleted);
   },
 };

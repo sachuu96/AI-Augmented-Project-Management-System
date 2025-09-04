@@ -10,7 +10,7 @@ type EventType = 'ProductCreated' | 'ProductUpdated' | 'ProductDeleted' | 'LowSt
  */
 export const publishEvent = (type: EventType, payload: Event) => {
   return new Promise<void>((resolve, reject) => {
-    const worker = new Worker(path.resolve(__dirname, 'worker.js'), {
+    const worker = new Worker(path.resolve(__dirname, 'worker.ts'), {
       workerData: { type, payload }
     });
 
