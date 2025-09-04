@@ -21,5 +21,11 @@ services:
       MINIO_ROOT_USER: minio
       MINIO_ROOT_PASSWORD: minio123
     ports: ["9000:9000","9001:9001"]
+  web:
+    build: ./apps/web
+    environment:
+      VITE_API_URL: http://localhost:3000
+      VITE_SSE_URL: http://localhost:3001/events/stream
+    ports: ["5173:5173"]
   
 
