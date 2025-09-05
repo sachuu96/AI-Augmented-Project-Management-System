@@ -3,6 +3,8 @@ import dotenv from 'dotenv';
 import productRoutes from './routes/productRoutes';
 import { errorHandler } from './middleware/errorMiddleware';
 import cors from 'cors';
+import { sseHandler } from "./sse";
+import { startConsumer } from "./events/consumer";
 
 dotenv.config();
 
@@ -12,6 +14,12 @@ app.use(cors())
 
 // Routes
 app.use('/products', productRoutes);
+
+// SSE endpoint
+app.get("/events/stream", sseHandler);
+
+// Start Kafka consumer in background
+startConsumer().catch(console.error);
 
 // Global error handler
 app.use(errorHandler);
