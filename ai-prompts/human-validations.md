@@ -1,0 +1,1 @@
+AI code has emitted LowStockWarning event type during product creation only. This needs to be emitted during product update also

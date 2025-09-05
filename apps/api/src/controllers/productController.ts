@@ -101,6 +101,20 @@ export const ProductController = {
     };
 
     publishEvent("ProductUpdated", event).catch(console.error);
+
+    if (parseInt(quantity) < 10) {
+      const warning: LawStockWarning = {
+        type: "LowStockWarning",
+        version: "1",
+        occurredAt: new Date().toISOString(),
+        sellerId,
+        productId,
+        quantity,
+        threshold: 10,
+      };
+      publishEvent("LowStockWarning", warning).catch(console.error);
+    }
+
     res.status(200).send(updatedProduct);
   },
 
