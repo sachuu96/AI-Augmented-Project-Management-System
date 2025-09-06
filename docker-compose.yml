@@ -2,13 +2,16 @@ version: "3.9"
 services:
   postgres:
     image: postgres:16
+    container_name: pg
     environment:
       POSTGRES_USER: postgres
       POSTGRES_DB: app
       POSTGRES_PASSWORD: password
     ports: ["5432:5432"]
+  
   redpanda:
     image: docker.redpanda.com/redpandadata/redpanda:v24.1.10
+    container_name: redpanda
     command:
       [
         "redpanda",
@@ -19,10 +22,16 @@ services:
         "--reserve-memory",
         "0M",
         "--check=false",
+        "--advertise-kafka-addr", "redpanda:9092",
+        "--advertise-rpc-addr", "redpanda:33145"
       ]
-    ports: ["9092:9092", "9644:9644"]
+    ports:
+      - "9092:9092"   # Kafka clients
+      - "9644:9644"   # Admin API
+  
   minio:
     image: minio/minio
+    container_name: minio
     command: server /data --console-address ":9001"
     environment:
       MINIO_ROOT_USER: minio
@@ -46,6 +55,44 @@ services:
     depends_on:
       - dynamodb
 
+  api:
+    image: node:18
+    working_dir: /app/api
+    volumes:
+      - ./apps/api:/app/api
+      - ./apps/api/node_modules:/app/api/node_modules
+    command: npm run dev
+    environment:
+      DATABASE_URL: postgresql://postgres:password@pg:5432/app?schema=public
+      DB_USER: postgres
+      DB_HOST: pg
+      DB_NAME: app
+      DB_PASSWORD: password
+      DB_PORT: 5432
+      LOW_STOCK_THRESHOLD: 5
+      MINIO_ENDPOINT: http://minio:9000
+      MINIO_ACCESS_KEY: minio
+      MINIO_SECRET_KEY: minio123
+      ENABLE_ANALYTICS: true
+      DYNAMO_ENDPOINT: http://dynamodb:8000
+      AWS_ACCESS_KEY_ID: fake
+      AWS_SECRET_ACCESS_KEY: fake
+      KAFKA_BROKERS: redpanda:9092
+      KAFKA_PRODUCT_CONSUMER_CLIENT_ID: product-consumer
+      KAFKA_PRODUCT_PUBLISH_CLIENT_ID: product-service
+      KAFKA_ANALYSIS_SERVICE_CLIENT_ID: analytics-service
+    depends_on:
+      postgres:
+        condition: service_started
+      redpanda:
+        condition: service_started
+      dynamodb:
+        condition: service_started
+      minio:
+        condition: service_started
+    ports:
+      - "3000:3000"
+
   web:
     image: node:22
     working_dir: /app/web
@@ -56,7 +103,7 @@ services:
     environment:
       VITE_API_URL: http://localhost:3000
       VITE_SSE_URL: http://localhost:3000/events/stream
-    # depends_on:
-    #   - api
+    depends_on:
+      - api
     ports:
       - "5173:5173"
