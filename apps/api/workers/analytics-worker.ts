@@ -1,6 +1,8 @@
 import { Kafka, EachMessagePayload } from "kafkajs";
 import { saveEvent as saveEventToDynamo} from './DynamoDBDocumentClient';
 import { saveArchiveEvent } from './s3Client';
+import { KafkaBrokers } from '../shared';
+
 // import { ProductCreated, ProductDeleted, ProductUpdated, LawStockWarning } from '../../../../packages/event-schemas/types';
 
 // Event shape
@@ -18,7 +20,7 @@ interface Aggregates {
 
 const kafka = new Kafka({
   clientId: process.env.KAFKA_ANALYSIS_SERVICE_CLIENT_ID || "analytics-service",
-  brokers: ["localhost:9092"],
+  brokers: KafkaBrokers,
 });
 
 const consumer = kafka.consumer({ groupId: "analytics-group" });

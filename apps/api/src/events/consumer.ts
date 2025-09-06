@@ -1,9 +1,10 @@
 import { Kafka } from "kafkajs";
 import { pushEvent } from "../sse";
+import { KafkaBrokers } from '../../shared';
 
 const kafka = new Kafka({
   clientId: process.env.KAFKA_PRODUCT_CONSUMER_CLIENT_ID || "product-consumer",
-  brokers: ["localhost:9092"],
+  brokers: KafkaBrokers,
 });
 
 const consumer = kafka.consumer({ groupId: "notifications-service" });

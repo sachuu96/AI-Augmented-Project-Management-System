@@ -1,9 +1,10 @@
 import { parentPort, workerData } from 'worker_threads';
 import { Kafka } from 'kafkajs';
+import { KafkaBrokers } from '../../shared';
 
 const kafka = new Kafka({
   clientId: process.env.KAFKA_PRODUCT_PUBLISH_CLIENT_ID || 'product-service',
-  brokers: ['localhost:9092']
+  brokers: KafkaBrokers
 });
 
 const producer = kafka.producer();
