@@ -9,15 +9,26 @@ services:
     ports: ["5432:5432"]
   redpanda:
     image: docker.redpanda.com/redpandadata/redpanda:v24.1.10
-    command: ["redpanda","start","--overprovisioned","--smp","1","--reserve-memory","0M","--check=false"]
-    ports: ["9092:9092","9644:9644"]
+    command:
+      [
+        "redpanda",
+        "start",
+        "--overprovisioned",
+        "--smp",
+        "1",
+        "--reserve-memory",
+        "0M",
+        "--check=false",
+      ]
+    ports: ["9092:9092", "9644:9644"]
   minio:
     image: minio/minio
     command: server /data --console-address ":9001"
     environment:
       MINIO_ROOT_USER: minio
       MINIO_ROOT_PASSWORD: minio123
-    ports: ["9000:9000","9001:9001"]
+    ports: ["9000:9000", "9001:9001"]
+    
   # web:
   #   build: ./apps/web
   #   environment:
@@ -32,17 +43,21 @@ services:
   #     # LOW_STOCK_THRESHOLD: "5"
   #   depends_on: [postgres]
   #   ports: ["3000:3000"]
-  sqs:
-    image: softwaremill/elasticmq:1.4.5
-    ports:
-      - "9324:9324" # API
-      - "9325:9325" # UI
-    # default config creates queues dynamically via CreateQueue
 
   dynamodb:
-    image: amazon/dynamodb-local:2.4.0
-    command: -jar DynamoDBLocal.jar -sharedDb -inMemory
+      image: amazon/dynamodb-local
+      container_name: dynamodb
+      ports:
+        - "8000:8000"
+      command: "-jar DynamoDBLocal.jar -inMemory -sharedDb"
+
+  dynamodb-admin:
+    image: aaronshaf/dynamodb-admin
+    container_name: dynamodb-admin
     ports:
-      - "8000:8000"
-  
+      - "8001:8001"
+    environment:
+      DYNAMO_ENDPOINT: http://dynamodb:8000
+    depends_on:
+      - dynamodb
 

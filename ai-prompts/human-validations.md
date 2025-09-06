@@ -1,3 +1,7 @@
 - AI code has emitted LowStockWarning event type during product creation only. This needs to be emitted during product update also
 - Notification panel was subscribed to low_stock_alert instead of LowStockWarning which does not mactch with emited event type from the backend. Fixed it
-- 
+- Manually verified and updated minio accessId and accessKey
+- seperate the code into two functions (to follow single responsibility concept) 
+    - writing to Dynamo db functionality 
+    - saving old events to S3 functionality 
+- create the dynamo db table before writing if the table does not exist

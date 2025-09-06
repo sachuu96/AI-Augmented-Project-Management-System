@@ -19,3 +19,11 @@ request validation
 for kafka integration
 `npm install kafkajs`
 `npm install --save-dev @types/node`
+
+for analysis-worker
+`npm install --save-dev @aws-sdk/client-dynamodb`
+`npm install --save-dev @aws-sdk/client-s3`
+
+during live demo - 
+`http://localhost:8001` - dynamo dashboard on browser
+`http://localhost:9001` - minio dashboard on browser

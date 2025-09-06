@@ -2,8 +2,8 @@ import { parentPort, workerData } from 'worker_threads';
 import { Kafka } from 'kafkajs';
 
 const kafka = new Kafka({
-  clientId: 'product-service',
-  brokers: ['localhost:9092'] // Update with your Kafka broker(s)
+  clientId: process.env.KAFKA_PRODUCT_PUBLISH_CLIENT_ID || 'product-service',
+  brokers: ['localhost:9092']
 });
 
 const producer = kafka.producer();

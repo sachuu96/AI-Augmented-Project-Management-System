@@ -2,8 +2,8 @@ import { Kafka } from "kafkajs";
 import { pushEvent } from "../sse";
 
 const kafka = new Kafka({
-  clientId: "product-consumer",
-  brokers: ["localhost:9092"], // same as in your publisher
+  clientId: process.env.KAFKA_PRODUCT_CONSUMER_CLIENT_ID || "product-consumer",
+  brokers: ["localhost:9092"],
 });
 
 const consumer = kafka.consumer({ groupId: "notifications-service" });
