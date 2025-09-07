@@ -3,11 +3,11 @@ import { saveEvent as saveEventToDynamo} from './DynamoDBDocumentClient';
 import { saveArchiveEvent } from './s3Client';
 import { KafkaBrokers } from '../shared';
 
-// import { ProductCreated, ProductDeleted, ProductUpdated, LawStockWarning } from '../../../../packages/event-schemas/types';
+import { PRODUCT_CREATED, PRODUCT_DELETED, PRODUCT_UPDATED, LOW_STOCK_WARNING } from '../shared';
 
 // Event shape
 interface EventMessage {
-  type: "ProductCreated" | "ProductUpdated" | "ProductDeleted" | "LowStockWarning";
+  type: typeof PRODUCT_CREATED | typeof PRODUCT_DELETED | typeof PRODUCT_UPDATED | typeof LOW_STOCK_WARNING;
   payload: Record<string, any>;
   ts?: string;
 }
@@ -33,14 +33,14 @@ const aggregates: Aggregates = {
 
 function updateAggregates(event: EventMessage) {
   switch (event.type) {
-    case "ProductCreated":
+    case PRODUCT_CREATED:
       if (event.payload?.category) {
         aggregates.perCategory[event.payload.category] =
           (aggregates.perCategory[event.payload.category] || 0) + 1;
       }
       break;
 
-    case "ProductDeleted":
+    case PRODUCT_DELETED:
       if (event.payload?.category) {
         aggregates.perCategory[event.payload.category] =
           Math.max(
@@ -50,7 +50,7 @@ function updateAggregates(event: EventMessage) {
       }
       break;
 
-    case "LowStockWarning":
+    case LOW_STOCK_WARNING:
       aggregates.lowStockCount++;
       break;
   }
@@ -79,7 +79,7 @@ export async function runAnalyticsWorker() {
     await consumer.connect();
   
     await consumer.subscribe({
-      topics: ["ProductCreated", "ProductUpdated", "ProductDeleted", "LowStockWarning"],
+      topics: [PRODUCT_CREATED, PRODUCT_UPDATED, PRODUCT_DELETED, LOW_STOCK_WARNING],
     });
   
     console.log("✅ Analytics service listening to events...");

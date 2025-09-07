@@ -5,26 +5,37 @@ import { ProductCreated, ProductDeleted, ProductUpdated, LawStockWarning } from 
 type Event = ProductCreated | ProductUpdated | ProductDeleted | LawStockWarning;
 type EventType = 'ProductCreated' | 'ProductUpdated' | 'ProductDeleted' | 'LowStockWarning';
 
+let worker: Worker | null = null;
+
+function getWorker() {
+  if (!worker) {
+    worker = new Worker(path.resolve(__dirname, 'worker.ts'));
+  }
+  return worker;
+}
+
 /**
- * Publish an event asynchronously using a worker thread.
+ * Publish an event asynchronously using a shared worker thread.
  */
 export const publishEvent = (type: EventType, payload: Event) => {
   return new Promise<void>((resolve, reject) => {
-    const worker = new Worker(path.resolve(__dirname, 'worker.ts'), {
-      workerData: { type, payload }
-    });
+    const workerInstance = getWorker();
 
-    worker.on('message', (msg) => {
+    // create unique correlation ID for responses
+    const correlationId = `${type}-${Date.now()}-${Math.random()}`;
+
+    const handleMessage = (msg: any) => {
+      if (msg.correlationId !== correlationId) return; // ignore unrelated messages
+
       if (msg.success) {
         resolve();
       } else {
         reject(new Error(msg.error || 'Unknown worker failure'));
       }
-    });
+      workerInstance.off('message', handleMessage);
+    };
 
-    worker.on('error', (err) => reject(err));
-    worker.on('exit', (code) => {
-      if (code !== 0) reject(new Error(`Worker stopped with exit code ${code}`));
-    });
+    workerInstance.on('message', handleMessage);
+    workerInstance.postMessage({ correlationId, type, payload });
   });
 };

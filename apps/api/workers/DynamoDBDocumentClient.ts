@@ -19,7 +19,7 @@ const ddbDoc = DynamoDBDocumentClient.from(client);
 export async function saveEvent(event: {
   type: string;
   payload: any;
-  ts: string;
+  ts?: string;
 }) {
   try {
     await ddbDoc.send(
