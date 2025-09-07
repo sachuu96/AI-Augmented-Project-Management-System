@@ -1,55 +1,47 @@
 import express from "express";
 import dotenv from "dotenv";
+import cors from "cors";
 import productRoutes from "./routes/productRoutes";
 import { errorHandler } from "./middleware/errorMiddleware";
-import cors from "cors";
 import { sseHandler } from "./sse";
-import { startConsumer } from "./events/consumer";
-import { runAnalyticsWorker } from "../workers/analytics-worker";
-import { ensureRecentEventsTable } from "../workers/initDynamo";
 
 dotenv.config();
 
-async function bootstrap() {
-  await ensureRecentEventsTable(); // make sure table exists
-
+export function createApp() {
   const app = express();
+
   app.use(express.json());
   app.use(cors());
 
   app.use("/products", productRoutes);
 
-  // SSE endpoint
   app.get("/events/stream", sseHandler);
 
-  // Start Kafka consumer in background
-  startConsumer().catch(console.error);
-
-  // Global error handler
   app.use(errorHandler);
 
-  const PORT = process.env.PORT || 3000;
-
-  app.listen(PORT, async () => {
-    console.log(`🚀 Express API listening on port ${PORT}`);
-
-    if (process.env.ENABLE_ANALYTICS === "true") {
-      runAnalyticsWorker().catch((err) => {
-        console.error("❌ Analytics worker failed", err);
-      });
-    }
-  });
+  return app;
 }
 
-bootstrap().catch((err) => {
-  console.error("Server failed to start", err);
-  process.exit(1);
-});
+// Only start the server if not in test mode
+if (process.env.NODE_ENV !== "test") {
+  const { ensureRecentEventsTable } = require("../workers/initDynamo");
+  const { startConsumer } = require("./events/consumer");
+  const { runAnalyticsWorker } = require("../workers/analytics-worker");
 
-// const app = express();
-// app.use(express.json());
-// app.use(cors());
+  (async () => {
+    await ensureRecentEventsTable();
+    const app = createApp();
+    const PORT = process.env.PORT || 3000;
+    app.listen(PORT, () => {
+      console.log(`🚀 Express API listening on port ${PORT}`);
 
-// Routes
+      if (process.env.ENABLE_ANALYTICS === "true") {
+        runAnalyticsWorker().catch((err: any) => {
+          console.error("❌ Analytics worker failed", err);
+        });
+      }
 
-// app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+      startConsumer().catch(console.error);
+    });
+  })();
+}
