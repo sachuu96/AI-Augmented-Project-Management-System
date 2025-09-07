@@ -81,6 +81,7 @@ services:
       KAFKA_PRODUCT_CONSUMER_CLIENT_ID: product-consumer
       KAFKA_PRODUCT_PUBLISH_CLIENT_ID: product-service
       KAFKA_ANALYSIS_SERVICE_CLIENT_ID: analytics-service
+      RECENT_EVENTS_TABLE_NAME: RecentEvents
     depends_on:
       postgres:
         condition: service_started

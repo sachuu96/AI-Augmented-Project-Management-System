@@ -13,7 +13,7 @@ const client = new DynamoDBClient({
   },
 });
 
-const TABLE_NAME = "RecentEvents";
+const TABLE_NAME = process.env.RECENT_EVENTS_TABLE_NAME || "RecentEvents";
 
 async function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));

@@ -15,7 +15,11 @@ export const publishEvent = (type: EventType, payload: Event) => {
     });
 
     worker.on('message', (msg) => {
-      resolve();
+      if (msg.success) {
+        resolve();
+      } else {
+        reject(new Error(msg.error || 'Unknown worker failure'));
+      }
     });
 
     worker.on('error', (err) => reject(err));
