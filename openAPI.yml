@@ -122,6 +122,8 @@ components:
           format: uuid
         quantity:
           type: integer
+        category:  
+          type: string 
         threshold:
           type: integer
           example: 10

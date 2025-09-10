@@ -16,20 +16,15 @@ const ddbDoc = DynamoDBDocumentClient.from(client);
 /**
  * Save an event into DynamoDB using PutItemCommand.
  */
-export async function saveEvent(event: {
-  type: string;
-  payload: any;
-  ts?: string;
-}) {
+export async function saveEvent(event: any) {
   try {
     await ddbDoc.send(
       new PutCommand({
         TableName: "RecentEvents",
         Item: {
           id: "123",
-          ts: new Date().toISOString(),
-          type: "ProductCreated",
-          payload: { foo: "bar" },
+          type: event.type,
+          payload: event,
         },
       })
     );
@@ -38,4 +33,3 @@ export async function saveEvent(event: {
     console.error("❌ DynamoDB write failed", err);
   }
 }
-

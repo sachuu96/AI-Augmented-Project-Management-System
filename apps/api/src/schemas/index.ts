@@ -80,6 +80,7 @@ export const LowStockWarningSchema = z.object({
   productId: z.string().uuid(),
   quantity: z.number().int(),
   threshold: z.number().int(),
+  category: z.string()
 });
 
 export type LowStockWarning = z.infer<typeof LowStockWarningSchema>;

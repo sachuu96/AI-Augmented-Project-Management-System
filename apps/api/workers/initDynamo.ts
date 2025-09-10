@@ -40,11 +40,9 @@ export async function ensureRecentEventsTable(maxRetries = 5) {
             BillingMode: "PAY_PER_REQUEST",
             AttributeDefinitions: [
               { AttributeName: "id", AttributeType: "S" },
-              { AttributeName: "ts", AttributeType: "S" },
             ],
             KeySchema: [
               { AttributeName: "id", KeyType: "HASH" }, // Partition key
-              { AttributeName: "ts", KeyType: "RANGE" }, // Sort key
             ],
           })
         );

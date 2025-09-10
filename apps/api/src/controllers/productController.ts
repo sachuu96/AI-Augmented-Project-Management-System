@@ -57,6 +57,7 @@ export const ProductController = {
         productId: id,
         quantity,
         threshold: 10,
+        category: product.category
       };
       publishEvent("LowStockWarning", warning).catch(console.error);
     }
@@ -94,6 +95,7 @@ export const ProductController = {
         productId: id,
         quantity: req.body.quantity,
         threshold: 10,
+        category: updatedProduct.category
       };
       publishEvent("LowStockWarning", warning).catch(console.error);
     }
