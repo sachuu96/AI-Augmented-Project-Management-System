@@ -1,24 +1,24 @@
-import { query } from "./db.js";
+import { query } from "./db";
 
 async function createTableIfNotExists() {
   await query(`
     CREATE TABLE IF NOT EXISTS products (
-      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-      seller_id VARCHAR(255) NOT NULL,
-      name VARCHAR(255) NOT NULL,
+      id UUID PRIMARY KEY,
+      sellerId TEXT NOT NULL,
+      name TEXT NOT NULL,
       description TEXT,
-      price NUMERIC(10, 2) NOT NULL CHECK (price >= 0),
-      quantity INT NOT NULL CHECK (quantity >= 0),
-      category VARCHAR(255) NOT NULL,
-      created_at TIMESTAMPTZ DEFAULT NOW(),
-      updated_at TIMESTAMPTZ DEFAULT NOW()
+      price NUMERIC NOT NULL CHECK (price >= 0),
+      quantity INTEGER NOT NULL CHECK (quantity >= 0),
+      category TEXT NOT NULL,
+      createdAt TIMESTAMP DEFAULT NOW() NOT NULL,
+      updatedAt TIMESTAMP DEFAULT NOW() NOT NULL
     );
 
-    -- Trigger to auto-update updated_at
+    -- Trigger to auto-update updatedAt
     CREATE OR REPLACE FUNCTION update_updated_at_column()
     RETURNS TRIGGER AS $$
     BEGIN
-       NEW.updated_at = NOW();
+       NEW.updatedAt = NOW();
        RETURN NEW;
     END;
     $$ LANGUAGE 'plpgsql';
@@ -42,15 +42,15 @@ async function seed() {
   await createTableIfNotExists();
 
   const products = [
-    { sellerId: "seller-1", name: "T-Shirt", description: "Cotton t-shirt", price: 19.99, quantity: 100, category: "Clothing" },
-    { sellerId: "seller-2", name: "Laptop", description: "15-inch laptop", price: 999.99, quantity: 20, category: "Electronics" },
-    { sellerId: "seller-1", name: "Coffee Mug", description: "Ceramic mug", price: 9.99, quantity: 50, category: "Kitchen" },
+    { sellerId: "seller-demo", name: "T-Shirt", description: "Cotton t-shirt", price: 19.99, quantity: 100, category: "Clothing" },
+    { sellerId: "seller-demo", name: "Laptop", description: "15-inch laptop", price: 999.99, quantity: 20, category: "Electronics" },
+    { sellerId: "seller-demo", name: "Coffee Mug", description: "Ceramic mug", price: 9.99, quantity: 50, category: "Kitchen" },
   ];
 
   for (const p of products) {
     await query(
-      `INSERT INTO products (seller_id, name, description, price, quantity, category)
-       VALUES ($1,$2,$3,$4,$5,$6)
+      `INSERT INTO products (id, sellerId, name, description, price, quantity, category)
+       VALUES (gen_random_uuid(), $1, $2, $3, $4, $5, $6)
        ON CONFLICT (id) DO NOTHING`,
       [p.sellerId, p.name, p.description, p.price, p.quantity, p.category]
     );

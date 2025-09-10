@@ -20,34 +20,111 @@ components:
         id: { type: string, format: uuid }
         sellerId: { type: string }
         name: { type: string }
-        description: { type: string }
+        description:
+          type: [string, null]
         price: { type: number }
         quantity: { type: integer }
         category: { type: string }
         createdAt: { type: string, format: date-time }
         updatedAt: { type: string, format: date-time }
+
     CreateProductInput:
       type: object
       required: [name, price, quantity, category]
       properties:
         name: { type: string, minLength: 1 }
-        description: { type: string }
+        description:
+          type: [string, null]
         price: { type: number, minimum: 0 }
         quantity: { type: integer, minimum: 0 }
         category: { type: string }
-    UpdateProductInput:
-      type: object
-      properties:
-        name: { type: string }
-        description: { type: string }
-        price: { type: number, minimum: 0 }
-        quantity: { type: integer, minimum: 0 }
-        category: { type: string }
+
     Error:
       type: object
       required: [message]
       properties:
         message: { type: string }
+
+    ProductCreated:
+      type: object
+      required: [type, version, occurredAt, sellerId, product]
+      properties:
+        type:
+          type: string
+          enum: ["ProductCreated"]
+        version:
+          type: string
+          example: "1"
+        occurredAt:
+          type: string
+          format: date-time
+        sellerId:
+          type: string
+        product:
+          $ref: "#/components/schemas/Product"
+
+    ProductUpdated:
+      type: object
+      required: [type, version, occurredAt, sellerId, product, changes]
+      properties:
+        type:
+          type: string
+          enum: ["ProductUpdated"]
+        version:
+          type: string
+          example: "1"
+        occurredAt:
+          type: string
+          format: date-time
+        sellerId:
+          type: string
+        product:
+          $ref: "#/components/schemas/Product"
+        changes:
+          $ref: "#/components/schemas/UpdateProductInput"
+
+    ProductDeleted:
+      type: object
+      required: [type, version, occurredAt, sellerId, productId]
+      properties:
+        type:
+          type: string
+          enum: ["ProductDeleted"]
+        version:
+          type: string
+          example: "1"
+        occurredAt:
+          type: string
+          format: date-time
+        sellerId:
+          type: string
+        productId:
+          type: string
+          format: uuid
+
+    LowStockWarning:
+      type: object
+      required: [type, version, occurredAt, sellerId, productId, quantity, threshold]
+      properties:
+        type:
+          type: string
+          enum: ["LowStockWarning"]
+        version:
+          type: string
+          example: "1"
+        occurredAt:
+          type: string
+          format: date-time
+        sellerId:
+          type: string
+        productId:
+          type: string
+          format: uuid
+        quantity:
+          type: integer
+        threshold:
+          type: integer
+          example: 10
 paths:
   /products:
     get:
@@ -103,26 +180,22 @@ paths:
           schema: { type: string, format: uuid }
       responses:
         "204": { description: No Content }
-  /products/export:
-    get:
-      summary: Stream CSV export of seller’s products
-      parameters: [ { $ref: "#/components/parameters/SellerIdHeader" } ]
-      responses:
-        "200":
-          description: text/csv streamed
-  /products/import:
-    post:
-      summary: Stream CSV import (name,description,price,quantity,category)
-      parameters: [ { $ref: "#/components/parameters/SellerIdHeader" } ]
-      requestBody:
-        required: true
-        content:
-          text/csv: {}
-      responses:
-        "202": { description: Accepted, import processed in-stream }
   /events/stream:
     get:
       summary: Server-Sent Events stream for low-stock alerts
+      description: |
+        Opens a long-lived connection that pushes server-sent events (SSE).
+        The stream emits `LowStockWarning` events when product stock drops below a threshold.
       responses:
         "200":
-          description: text/event-stream
+          description: text/event-stream with LowStockWarning events
+          content:
+            text/event-stream:
+              schema:
+                type: object
+                properties:
+                  event:
+                    type: string
+                    enum: ["LowStockWarning"]
+                  data:
+                    $ref: "#/components/schemas/LowStockWarning"

@@ -56,7 +56,6 @@ export default function ProductModal({ open, onClose, onSave, productToEdit }: P
       await onSave(form, productToEdit?.id);
       onClose();
     } catch (err) {
-      // Human in the Loop: consider exposing error to user via toast
       console.error(err);
     } finally {
       setSaving(false);

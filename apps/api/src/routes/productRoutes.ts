@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { ProductController } from '../controllers/productController';
 import { sellerMiddleware } from '../middleware/sellerMiddleware';
 import { validate } from '../middleware/validationMiddleware';
-import { createProductSchema } from '../schemas/productSchemas';
+import { CreateProductInputSchema } from '../schemas/inputSchemas';
 
 const router = Router();
 
@@ -10,9 +10,8 @@ const router = Router();
 router.use(sellerMiddleware);
 
 router.get('/', ProductController.getAll);
-router.get('/:id', ProductController.getById);
-router.post('/', validate(createProductSchema), ProductController.create);
-router.put('/:id', ProductController.update);
+router.post('/', validate(CreateProductInputSchema), ProductController.create);
+router.put('/:id' ,ProductController.update);
 router.delete('/:id', ProductController.delete);
 
 export default router;

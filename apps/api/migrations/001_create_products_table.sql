@@ -1,22 +1,22 @@
-CREATE TABLE IF NOT EXISTS products (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    seller_id VARCHAR(255) NOT NULL,
-    name VARCHAR(255) NOT NULL,
-    description TEXT,
-    price NUMERIC(10, 2) NOT NULL CHECK (price >= 0),
-    quantity INT NOT NULL CHECK (quantity >= 0),
-    category VARCHAR(255) NOT NULL,
-    created_at TIMESTAMPTZ DEFAULT NOW(),
-    updated_at TIMESTAMPTZ DEFAULT NOW()
+CREATE TABLE products (
+  id UUID PRIMARY KEY,
+  sellerId TEXT NOT NULL,
+  name TEXT NOT NULL,
+  description TEXT,
+  price NUMERIC NOT NULL,
+  quantity INTEGER NOT NULL,
+  category TEXT NOT NULL,
+  createdAt TIMESTAMP DEFAULT now() NOT NULL,
+  updatedAt TIMESTAMP DEFAULT now() NOT NULL
 );
 
-CREATE INDEX idx_products_seller_id ON products(seller_id);
+CREATE INDEX idx_products_seller_id ON products(sellerId);
 
 -- Trigger for updated_at
 CREATE OR REPLACE FUNCTION update_updated_at_column()
 RETURNS TRIGGER AS $$
 BEGIN
-   NEW.updated_at = NOW();
+   NEW.updatedAt = NOW();
    RETURN NEW;
 END;
 $$ LANGUAGE 'plpgsql';
