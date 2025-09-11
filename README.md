@@ -36,47 +36,33 @@ minio - S3-compatible object storage
       - Used by notifier for storing archived events.
 
 
-<h1>Human validation</h1>
-
-
-- AI code has emitted LowStockWarning event type during product creation only. This needs to be emitted during product update also
-- Notification panel was subscribed to low_stock_alert instead of LowStockWarning which does not mactch with emited event type from the backend. Fixed it
-- Manually verified and updated minio accessId and accessKey
-- seperate the code into two functions (to follow single responsibility concept) 
-    - writing to Dynamo db functionality 
-    - saving old events to S3 functionality 
-- create the dynamo db table before writing if the table does not exist
-- worker.ts file connects to kafka producer and producer publishes the message with topic and payload. Then worker thread sends {success:true} object to the main thread. But in publisher.ts value of success key was not checked. Fixed it (if true - resolves. if false - rejects)
-- AI generated code spins up a new worker thread and Kafka producer connection for every request, which is very expensive - I scaffold the code to use a single kafka procuder (singleton producer instance) dedicated to a one worker thread and that worker thread is dedicated to publishing.
-these are the benifits I saw
-- No repeated connect() / disconnect() overhead.
-
-- No new worker thread per request.
-
-- One long-lived producer keeps TCP connections to Kafka brokers alive, which is efficient.
-
 - backpreasure handle 
     - wait till kafka producer is created
     - retry 5 times to connect to dynamo database
 
-What I accepted
-------------------
-- When I call publishEvent("ProductCreated", payload) in through product controller, it spawns a Worker pointing at worker.ts passing the event This approach, isolates each call in its own worker thread. That worker thread does only one thing: connect -> publish event -> disconnect -> exit
-That is a good approach since it decouples the application: the API handler doesn’t care how/where events are published, only that the worker will handle it.
-
-- worker thread invocation is wrapped inside publishEvent function - following decorator pattern
 
 My assumptions and justifications
 ---------------------------------
 
 <b>I decided to go with kafka because</b>
 
-- Kafka is designed to support multiple consumers to consume events independently unlike traditional message queues (SQS/rabbitMQ) - usage of consumer groups
--  Events are not removed from the topic after being consumed by a consumer - long durability unlike SQS
-- supports decoupling - consumers can operate independetly
-- scalability - Multiple consumers can handle high volume of events which eventually improves the overall system performances
-- Kafka can handle high-throughput and best for real time data processing (That is a main requirement of the application - 10k+ rps)
-- kafka message persistance - ensures that events are not lost in case of a failure
+- Scalability 
+    - horizontal scalling - supports consumer groups so that we can increase number of consumers independetly with out effecting the producers (supports decoupling).
+    - Multiple consumers can handle high volume of events which eventually improves the overall system performances
+    - Designed to handle millions of events/second 
+    
+- Reliablity
+    -  long durability and message persistance- Events are not removed from the topic after being consumed by a consumer (They are being replicated accross brokers)- long durability unlike SQS
+    - unlike RabbitMQ kafka is more fault-tolerant for high-throughput and long-lived event storage
+    - Kafka can handle high-throughput and best for real time data processing (That is a main requirement of the application - 10k+ rps)
+
+- Integration
+    - broad eco system support - backend service (nodejs, python, java) can all consume from kafka easily
+
+- cost
+    - open source
+    - it can be cost effective for large-scale work loads
+    - with it's distributed architecture it could be bit complex to configure it
 
 
 <b>Usage of worker threads in node js</b>
