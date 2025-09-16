@@ -55,6 +55,12 @@ services:
     depends_on:
       - dynamodb
 
+  redis:
+    image: redis:7-alpine
+    container_name: redis
+    ports:
+      - "6379:6379"
+
   api:
     image: node:18
     working_dir: /app/api
@@ -73,7 +79,7 @@ services:
       MINIO_ENDPOINT: http://minio:9000
       MINIO_ACCESS_KEY: minio
       MINIO_SECRET_KEY: minio123
-      ENABLE_ANALYTICS: true
+      ENABLE_ANALYTICS: "true"
       DYNAMO_ENDPOINT: http://dynamodb:8000
       AWS_ACCESS_KEY_ID: fake
       AWS_SECRET_ACCESS_KEY: fake
@@ -82,6 +88,9 @@ services:
       KAFKA_PRODUCT_PUBLISH_CLIENT_ID: product-service
       KAFKA_ANALYSIS_SERVICE_CLIENT_ID: analytics-service
       RECENT_EVENTS_TABLE_NAME: RecentEvents
+      REDIS_URL: redis://redis:6379
+      RATE_LIMIT_WINDOW_MS: 60000
+      RATE_LIMIT_MAX_REQUESTS: 10
     depends_on:
       postgres:
         condition: service_started
@@ -90,6 +99,8 @@ services:
       dynamodb:
         condition: service_started
       minio:
+        condition: service_started
+      redis:
         condition: service_started
     ports:
       - "3000:3000"
