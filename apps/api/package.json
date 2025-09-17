@@ -7,7 +7,10 @@
     "dev": "ts-node-dev --respawn --transpile-only src/index.ts",
     "build": "tsc",
     "start": "node dist/index.js",
-    "test": "NODE_ENV=test jest --detectOpenHandles --forceExit"
+    "test": "NODE_ENV=test jest --detectOpenHandles --forceExit",
+    "test:batch": "NODE_ENV=test jest --testPathPatterns='batchConfig|healthCheck|batchPublisher.simple' --verbose",
+    "test:batch:coverage": "NODE_ENV=test jest --testPathPatterns='batchConfig|healthCheck|batchPublisher.simple' --coverage --coverageDirectory=coverage/batch-processing",
+    "test:health": "NODE_ENV=test jest --testPathPatterns=healthCheck.test.ts --verbose"
   },
   "author": "",
   "license": "ISC",

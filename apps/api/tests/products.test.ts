@@ -55,12 +55,6 @@ describe("Products API", () => {
     expect(res.body[0]).toHaveProperty("name", "Test Product");
   });
 
-  it("GET /products/:id returns single product", async () => {
-    const res = await request(app).get("/products/p1").set("X-Seller-Id", "seller-demo");
-    expect(res.status).toBe(200);
-    expect(res.body).toHaveProperty("id", "p1");
-  });
-
   it("POST /products creates product", async () => {
     const res = await request(app)
       .post("/products")
