@@ -50,3 +50,29 @@ This is important when there is an error occured while event consuming. If a con
 used prompt - Add manual acknowledgment after successful processing. Use commitOffsets() after batch processing to ensure exactly-once delivery
 
 6. move the kafka producer to application level with centralized connection management to improve the resource management. keep using the dedicated worker threads to handle kafka operations so that main thread does not get blocked.
+
+
+Current Strengths
+-------------------
+1. Centralized Connection Management:-  KafkaConnectionManager efficiently manages all Kafka connections with connection pooling and retry logic
+2. Optimized Batch Processing:- Both producer and consumers use batching for better throughput
+3. Transactional Guarantees:- Critical operations use Kafka transactions for exactly-once delivery
+4. Shared Configuration:- Consistent batch and connection settings across all components
+
+Current Limitations
+-----------------------
+1. Tight Coupling:- All components share the same process and resource pool
+2. Single Point of Failure:- If the main service fails, all event processing stops
+3. Resource Contention:- Producer and consumers compete for CPU, memory, and network resources
+4. Scaling Constraints:- Cannot scale consumers independently based on their specific workload patterns
+
+7. Prompt - 
+
+Decouple consumers (notifications-service, analytics-group) and producer into two microservices to improve scalability. Achieve it by following below phases
+phase 1 - extract analysis service
+phase 2 - extract notification service
+phase 3 - optimize producer service
+
+My consumers have distinct responsibilities:
+Notifications: Real-time user experience (low latency priority)
+Analytics: Data processing and storage (throughput priority)

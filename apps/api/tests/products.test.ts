@@ -3,13 +3,6 @@ import { createApp } from "../src/index";
 
 const app = createApp();
 
-// Mocks stay the same
-jest.mock("@aws-sdk/client-dynamodb", () => ({
-  DynamoDBClient: jest.fn(() => ({ send: jest.fn() })),
-  DescribeTableCommand: jest.fn(),
-  CreateTableCommand: jest.fn(),
-}));
-
 jest.mock("../src/services/productService", () => ({
   ProductService: {
     getAll: jest.fn(() => [

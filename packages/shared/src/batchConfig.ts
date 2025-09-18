@@ -39,6 +39,20 @@ export const BATCH_CONFIG = {
     HEARTBEAT_INTERVAL_MS: parseInt(process.env.KAFKA_HEARTBEAT_INTERVAL_MS || '3000'),
   },
 
+  // KEDA scaling thresholds
+  SCALING: {
+    // Lag threshold that triggers scaling up
+    LAG_THRESHOLD: parseInt(process.env.KEDA_LAG_THRESHOLD || '10'),
+    
+    // High priority topics get lower lag threshold
+    HIGH_PRIORITY_LAG_THRESHOLD: parseInt(process.env.KEDA_HIGH_PRIORITY_LAG_THRESHOLD || '5'),
+    
+    // Topics considered high priority
+    HIGH_PRIORITY_TOPICS: process.env.KEDA_HIGH_PRIORITY_TOPICS !== undefined ?
+      process.env.KEDA_HIGH_PRIORITY_TOPICS.split(',') :
+      ['LowStockWarning'],
+  },
+
   // Topic configuration
   TOPICS: {
     // Number of partitions per topic (affects parallelism)
@@ -69,6 +83,13 @@ export function getBatchConfig() {
       MAX_BYTES: parseInt(process.env.KAFKA_CONSUMER_MAX_BYTES || '1048576'),
       SESSION_TIMEOUT_MS: parseInt(process.env.KAFKA_SESSION_TIMEOUT_MS || '30000'),
       HEARTBEAT_INTERVAL_MS: parseInt(process.env.KAFKA_HEARTBEAT_INTERVAL_MS || '3000'),
+    },
+    SCALING: {
+      LAG_THRESHOLD: parseInt(process.env.KEDA_LAG_THRESHOLD || '10'),
+      HIGH_PRIORITY_LAG_THRESHOLD: parseInt(process.env.KEDA_HIGH_PRIORITY_LAG_THRESHOLD || '5'),
+      HIGH_PRIORITY_TOPICS: process.env.KEDA_HIGH_PRIORITY_TOPICS !== undefined ?
+        process.env.KEDA_HIGH_PRIORITY_TOPICS.split(',') :
+        ['LowStockWarning'],
     },
     TOPICS: {
       PARTITIONS: parseInt(process.env.KAFKA_TOPIC_PARTITIONS || '3'),
@@ -117,4 +138,41 @@ function getDefaultMaxWaitTime(env: string): number {
     case 'test': return 50;
     default: return 100;
   }
+}
+
+/**
+ * Validate batch configuration
+ */
+export function validateBatchConfig(config = getBatchConfig()) {
+  const errors: string[] = [];
+  
+  if (config.PRODUCER.BATCH_SIZE <= 0) {
+    errors.push('PRODUCER.BATCH_SIZE must be greater than 0');
+  }
+  
+  if (config.PRODUCER.BATCH_TIMEOUT_MS <= 0) {
+    errors.push('PRODUCER.BATCH_TIMEOUT_MS must be greater than 0');
+  }
+  
+  if (config.PRODUCER.MAX_BATCH_SIZE < config.PRODUCER.BATCH_SIZE) {
+    errors.push('PRODUCER.MAX_BATCH_SIZE must be >= PRODUCER.BATCH_SIZE');
+  }
+  
+  if (config.CONSUMER.MIN_BYTES <= 0) {
+    errors.push('CONSUMER.MIN_BYTES must be greater than 0');
+  }
+  
+  if (config.CONSUMER.MAX_WAIT_TIME_MS <= 0) {
+    errors.push('CONSUMER.MAX_WAIT_TIME_MS must be greater than 0');
+  }
+  
+  if (config.SCALING.LAG_THRESHOLD <= 0) {
+    errors.push('SCALING.LAG_THRESHOLD must be greater than 0');
+  }
+  
+  if (errors.length > 0) {
+    throw new Error(`Invalid batch configuration: ${errors.join(', ')}`);
+  }
+  
+  return true;
 }

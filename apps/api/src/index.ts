@@ -3,8 +3,7 @@ import dotenv from "dotenv";
 import cors from "cors";
 import productRoutes from "./routes/productRoutes";
 import { errorHandler } from "./middleware/errorMiddleware";
-import { sseHandler } from "./sse";
-import kafkaConnectionManager from "./kafka/connectionManager";
+import producerKafkaManager from "./kafka/connectionManager";
 
 dotenv.config();
 
@@ -15,8 +14,6 @@ export function createApp() {
   app.use(cors());
 
   app.use("/products", productRoutes);
-
-  app.get("/events/stream", sseHandler);
 
   // Health check endpoints
   app.get("/health", (req, res) => {
@@ -35,8 +32,8 @@ export function createApp() {
       const batchStatus = batchPublisher.getBatchStatus();
       
       // Check Kafka connection status
-      const kafkaHealth = await kafkaConnectionManager.healthCheck();
-      const kafkaStatus = kafkaConnectionManager.getConnectionStatus();
+      const kafkaHealth = await producerKafkaManager.healthCheck();
+      const kafkaStatus = producerKafkaManager.getConnectionStatus();
       
       // Check if essential services are ready
       const readinessChecks = {
@@ -75,7 +72,7 @@ export function createApp() {
   app.get("/metrics", (req, res) => {
     try {
       const { batchPublisher } = require("./events/publisher");
-      const kafkaStatus = kafkaConnectionManager.getConnectionStatus();
+      const kafkaStatus = producerKafkaManager.getConnectionStatus();
       
       const metrics = {
         uptime: process.uptime(),
@@ -97,7 +94,7 @@ export function createApp() {
       res.status(200).json(metrics);
     } catch (error) {
       // Fallback if batch publisher is not available
-      const kafkaStatus = kafkaConnectionManager.getConnectionStatus();
+      const kafkaStatus = producerKafkaManager.getConnectionStatus();
       const metrics = {
         uptime: process.uptime(),
         memory: process.memoryUsage(),
@@ -216,10 +213,6 @@ batch_publisher_error{job="api"} 1
 
 // Only start the server if not in test mode
 if (process.env.NODE_ENV !== "test") {
-  const { ensureRecentEventsTable } = require("../workers/initDynamo");
-  const { startConsumer } = require("./events/consumer");
-  const { runAnalyticsWorker } = require("../workers/analytics-worker");
-
   (async () => {
     try {
       const app = createApp();
@@ -227,46 +220,28 @@ if (process.env.NODE_ENV !== "test") {
       
       // Start the server first, then initialize external services
       app.listen(PORT, async () => {
-        console.log(`🚀 Express API listening on port ${PORT}`);
-
-        // Initialize DynamoDB tables (non-blocking)
-        try {
-          console.log('🗄️ Initializing DynamoDB tables...');
-          await ensureRecentEventsTable();
-          console.log('✅ DynamoDB tables initialized');
-        } catch (error) {
-          console.error('⚠️ DynamoDB initialization failed, but server will continue running:', error);
-          console.log('📝 Analytics features may not work until DynamoDB is available');
-        }
+        console.log(`🚀 API Service (Producer) listening on port ${PORT}`);
 
         // Initialize Kafka connections and topics (non-blocking)
         try {
-          console.log('🔌 Initializing Kafka connections...');
-          await kafkaConnectionManager.initializeTopics();
+          console.log('🔌 Initializing Kafka producer...');
+          await producerKafkaManager.initializeTopics();
           
           // Pre-connect producer for faster first message
-          await kafkaConnectionManager.getProducer();
-          console.log('✅ Kafka producer connected');
-          
-          // Start Kafka consumer
-          await startConsumer();
-          console.log('✅ Kafka consumer started');
+          await producerKafkaManager.getProducer();
+          console.log('✅ Kafka producer connected and ready');
           
         } catch (error) {
           console.error('⚠️ Kafka initialization failed, but server will continue running:', error);
-          console.log('📝 Application will work without real-time events until Kafka is available');
+          console.log('📝 Application will work without events until Kafka is available');
         }
 
-        // Start analytics worker if enabled
-        if (process.env.ENABLE_ANALYTICS === "true") {
-          runAnalyticsWorker().catch((err: any) => {
-            console.error("❌ Analytics worker failed", err);
-          });
-        }
+        console.log('✅ API Service (Producer-only) started successfully');
+        console.log('📝 Consumer services should be running separately');
       });
       
     } catch (error) {
-      console.error('❌ Failed to initialize application:', error);
+      console.error('❌ Failed to initialize API service:', error);
       process.exit(1);
     }
   })();

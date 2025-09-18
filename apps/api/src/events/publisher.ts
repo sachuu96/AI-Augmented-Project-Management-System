@@ -1,8 +1,8 @@
 import { Worker } from "worker_threads";
 import path from "path";
-import { Event } from "../schemas/index";
 import { getBatchConfig } from "./batchConfig";
-import kafkaConnectionManager from "../kafka/connectionManager";
+import { Event } from "../schemas/index";
+import producerKafkaManager from "../kafka/connectionManager";
 
 type EventType =
   | "ProductCreated"
@@ -175,14 +175,14 @@ class BatchEventPublisher {
    * Get Kafka connection status for health checks
    */
   getKafkaStatus() {
-    return kafkaConnectionManager.getConnectionStatus();
+    return producerKafkaManager.getConnectionStatus();
   }
 
   /**
    * Perform health check on Kafka connections
    */
   async healthCheck() {
-    return await kafkaConnectionManager.healthCheck();
+    return await producerKafkaManager.healthCheck();
   }
 }
 

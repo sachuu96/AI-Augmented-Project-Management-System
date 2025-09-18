@@ -55,6 +55,18 @@ services:
     depends_on:
       - dynamodb
 
+  # Shared package build
+  shared:
+    image: node:18
+    working_dir: /app/shared
+    volumes:
+      - ./packages/shared:/app/shared
+      - ./packages/shared/node_modules:/app/shared/node_modules
+    command: npm run build
+    profiles:
+      - build
+
+  # API Service (Producer only)
   api:
     image: node:18
     working_dir: /app/api
@@ -70,21 +82,39 @@ services:
       DB_PASSWORD: password
       DB_PORT: 5432
       LOW_STOCK_THRESHOLD: 5
-      MINIO_ENDPOINT: http://minio:9000
-      MINIO_ACCESS_KEY: minio
-      MINIO_SECRET_KEY: minio123
-      ENABLE_ANALYTICS: true
-      DYNAMO_ENDPOINT: http://dynamodb:8000
-      AWS_ACCESS_KEY_ID: fake
-      AWS_SECRET_ACCESS_KEY: fake
       KAFKA_BROKERS: redpanda:9092
-      KAFKA_PRODUCT_CONSUMER_CLIENT_ID: product-consumer
-      KAFKA_PRODUCT_PUBLISH_CLIENT_ID: product-service
-      KAFKA_ANALYSIS_SERVICE_CLIENT_ID: analytics-service
-      RECENT_EVENTS_TABLE_NAME: RecentEvents
+      KAFKA_CLIENT_ID: api-service
+      KAFKA_TRANSACTIONAL_ID: api-service-transaction
     depends_on:
       postgres:
         condition: service_started
+      redpanda:
+        condition: service_started
+    ports:
+      - "3000:3000"
+
+  # Analytics Service
+  analytics-service:
+    image: node:18
+    working_dir: /app/analytics
+    volumes:
+      - ./apps/analytics-service:/app/analytics
+      - ./apps/analytics-service/node_modules:/app/analytics/node_modules
+      - ./packages/shared/node_modules:/app/shared/node_modules
+    command: sh -c "npm install && npm run dev"
+    environment:
+      KAFKA_BROKERS: redpanda:9092
+      KAFKA_CLIENT_ID: analytics-service
+      MINIO_ENDPOINT: http://minio:9000
+      MINIO_ACCESS_KEY: minio
+      MINIO_SECRET_KEY: minio123
+      DYNAMO_ENDPOINT: http://dynamodb:8000
+      AWS_ACCESS_KEY_ID: fake
+      AWS_SECRET_ACCESS_KEY: fake
+      RECENT_EVENTS_TABLE_NAME: RecentEvents
+      ARCHIVE_BUCKET_NAME: event-archive
+      HEALTH_PORT: 8080
+    depends_on:
       redpanda:
         condition: service_started
       dynamodb:
@@ -92,7 +122,26 @@ services:
       minio:
         condition: service_started
     ports:
-      - "3000:3000"
+      - "8080:8080"
+
+  # Notifications Service
+  notifications-service:
+    image: node:18
+    working_dir: /app/notifications
+    volumes:
+      - ./apps/notifications-service:/app/notifications
+      - ./apps/notifications-service/node_modules:/app/notifications/node_modules
+      - ./packages/shared/node_modules:/app/shared/node_modules
+    command: sh -c "npm install && npm run dev"
+    environment:
+      KAFKA_BROKERS: redpanda:9092
+      KAFKA_CLIENT_ID: notifications-service
+      PORT: 3001
+    depends_on:
+      redpanda:
+        condition: service_started
+    ports:
+      - "3001:3001"
 
   web:
     image: node:22
@@ -103,8 +152,9 @@ services:
     command: npm run dev -- --host 0.0.0.0
     environment:
       VITE_API_URL: http://localhost:3000
-      VITE_SSE_URL: http://localhost:3000/events/stream
+      VITE_SSE_URL: http://localhost:3001/events/stream
     depends_on:
       - api
+      - notifications-service
     ports:
       - "5173:5173"

@@ -1,27 +1,29 @@
-import { Kafka, Producer, Consumer, Admin } from 'kafkajs';
-import { KafkaBrokers, PRODUCT_CREATED, PRODUCT_DELETED, PRODUCT_UPDATED, LOW_STOCK_WARNING } from '../../shared';
+import { Kafka, Producer, Admin } from 'kafkajs';
+import {
+  KafkaBrokers,
+  PRODUCT_CREATED,
+  PRODUCT_DELETED,
+  PRODUCT_UPDATED,
+  LOW_STOCK_WARNING
+} from '../../shared';
 import { getBatchConfig } from '../events/batchConfig';
 
 /**
- * Centralized Kafka Connection Manager
- * Manages all Kafka connections at application level for better resource management
+ * Producer-Only Kafka Connection Manager
+ * Optimized for high-throughput event publishing
  */
-class KafkaConnectionManager {
+class ProducerKafkaConnectionManager {
   private kafka: Kafka;
   private producer: Producer | null = null;
-  private consumer: Consumer | null = null;
-  private analyticsConsumer: Consumer | null = null;
   private admin: Admin | null = null;
   private isProducerConnected = false;
-  private isConsumerConnected = false;
-  private isAnalyticsConsumerConnected = false;
   private isAdminConnected = false;
   private connectionPromises: Map<string, Promise<void>> = new Map();
   private config = getBatchConfig();
 
   constructor() {
     this.kafka = new Kafka({
-      clientId: process.env.KAFKA_CLIENT_ID || 'product-service',
+      clientId: process.env.KAFKA_CLIENT_ID || 'api-service',
       brokers: KafkaBrokers,
     });
   }
@@ -44,10 +46,12 @@ class KafkaConnectionManager {
     if (!this.producer) {
       this.producer = this.kafka.producer({
         idempotent: true, // Enable idempotent producer for exactly-once delivery
-        transactionalId: process.env.KAFKA_TRANSACTIONAL_ID || 'product-service-transaction',
+        transactionalId: process.env.KAFKA_TRANSACTIONAL_ID || 'api-service-transaction',
         maxInFlightRequests: 1, // Required for idempotence
         // Add compression if enabled
         ...(this.config.PRODUCER.ENABLE_COMPRESSION && { compression: 'gzip' }),
+        // Note: batchSize and lingerMs are not valid producer config properties in KafkaJS
+        // These are handled at the send level, not producer creation level
       });
     }
 
@@ -60,84 +64,6 @@ class KafkaConnectionManager {
       return this.producer;
     } finally {
       this.connectionPromises.delete('producer');
-    }
-  }
-
-  /**
-   * Get or create consumer instance with connection management
-   */
-  async getConsumer(): Promise<Consumer> {
-    if (this.consumer && this.isConsumerConnected) {
-      return this.consumer;
-    }
-
-    // Check if connection is already in progress
-    if (this.connectionPromises.has('consumer')) {
-      await this.connectionPromises.get('consumer');
-      return this.consumer!;
-    }
-
-    // Create new consumer if needed
-    if (!this.consumer) {
-      this.consumer = this.kafka.consumer({
-        groupId: "notifications-service",
-        minBytes: this.config.CONSUMER.MIN_BYTES,
-        maxBytes: this.config.CONSUMER.MAX_BYTES,
-        maxWaitTimeInMs: this.config.CONSUMER.MAX_WAIT_TIME_MS,
-        sessionTimeout: this.config.CONSUMER.SESSION_TIMEOUT_MS,
-        heartbeatInterval: this.config.CONSUMER.HEARTBEAT_INTERVAL_MS,
-      });
-    }
-
-    // Connect consumer
-    const connectionPromise = this.connectConsumer();
-    this.connectionPromises.set('consumer', connectionPromise);
-    
-    try {
-      await connectionPromise;
-      return this.consumer;
-    } finally {
-      this.connectionPromises.delete('consumer');
-    }
-  }
-
-  /**
-   * Get or create analytics consumer instance with connection management
-   */
-  async getAnalyticsConsumer(): Promise<Consumer> {
-    const analyticsConnectionKey = 'analyticsConnection';
-    
-    // Check if we already have a connected analytics consumer
-    if (this.analyticsConsumer && this.isAnalyticsConsumerConnected) {
-      return this.analyticsConsumer;
-    }
-
-    // Check if connection is already in progress
-    if (this.connectionPromises.has(analyticsConnectionKey)) {
-      await this.connectionPromises.get(analyticsConnectionKey);
-      return this.analyticsConsumer!;
-    }
-
-    // Create new analytics consumer if needed
-    if (!this.analyticsConsumer) {
-      this.analyticsConsumer = this.kafka.consumer({
-        groupId: "analytics-group",
-        minBytes: 1024, // fetch.min.bytes - minimum bytes to fetch
-        maxWaitTimeInMs: 100, // fetch.max.wait.ms - max wait time for batching
-        sessionTimeout: this.config.CONSUMER.SESSION_TIMEOUT_MS,
-        heartbeatInterval: this.config.CONSUMER.HEARTBEAT_INTERVAL_MS,
-      });
-    }
-
-    // Connect analytics consumer
-    const connectionPromise = this.connectAnalyticsConsumer();
-    this.connectionPromises.set(analyticsConnectionKey, connectionPromise);
-    
-    try {
-      await connectionPromise;
-      return this.analyticsConsumer;
-    } finally {
-      this.connectionPromises.delete(analyticsConnectionKey);
     }
   }
 
@@ -205,13 +131,13 @@ class KafkaConnectionManager {
 
     try {
       await admin.createTopics({ topics, waitForLeaders: true });
-      console.log(`[KafkaConnectionManager] Created topics with ${partitionCount} partitions`);
+      console.log(`[ProducerKafkaManager] Created topics with ${partitionCount} partitions`);
     } catch (error: any) {
       // Topics might already exist, which is fine
       if (!error.message?.includes('already exists')) {
         throw error;
       }
-      console.log(`[KafkaConnectionManager] Topics already exist`);
+      console.log(`[ProducerKafkaManager] Topics already exist`);
     }
   }
 
@@ -228,43 +154,14 @@ class KafkaConnectionManager {
       try {
         await this.producer!.connect();
         this.isProducerConnected = true;
-        console.log('[KafkaConnectionManager] Producer connected with idempotence enabled');
+        console.log('[ProducerKafkaManager] Producer connected with idempotence enabled');
         return;
       } catch (error: any) {
         retryCount++;
-        console.error(`[KafkaConnectionManager] Failed to connect producer (attempt ${retryCount}/${maxRetries}):`, error.message);
+        console.error(`[ProducerKafkaManager] Failed to connect producer (attempt ${retryCount}/${maxRetries}):`, error.message);
         
         if (retryCount >= maxRetries) {
           throw new Error(`Failed to connect producer after ${maxRetries} attempts: ${error.message}`);
-        }
-        
-        // Wait before retrying (exponential backoff)
-        await new Promise(resolve => setTimeout(resolve, Math.pow(2, retryCount) * 1000));
-      }
-    }
-  }
-
-  /**
-   * Connect consumer with retry logic
-   */
-  private async connectConsumer(): Promise<void> {
-    if (this.isConsumerConnected) return;
-
-    const maxRetries = 3;
-    let retryCount = 0;
-
-    while (retryCount < maxRetries) {
-      try {
-        await this.consumer!.connect();
-        this.isConsumerConnected = true;
-        console.log('[KafkaConnectionManager] Consumer connected');
-        return;
-      } catch (error: any) {
-        retryCount++;
-        console.error(`[KafkaConnectionManager] Failed to connect consumer (attempt ${retryCount}/${maxRetries}):`, error.message);
-        
-        if (retryCount >= maxRetries) {
-          throw new Error(`Failed to connect consumer after ${maxRetries} attempts: ${error.message}`);
         }
         
         // Wait before retrying (exponential backoff)
@@ -286,43 +183,14 @@ class KafkaConnectionManager {
       try {
         await this.admin!.connect();
         this.isAdminConnected = true;
-        console.log('[KafkaConnectionManager] Admin connected');
+        console.log('[ProducerKafkaManager] Admin connected');
         return;
       } catch (error: any) {
         retryCount++;
-        console.error(`[KafkaConnectionManager] Failed to connect admin (attempt ${retryCount}/${maxRetries}):`, error.message);
+        console.error(`[ProducerKafkaManager] Failed to connect admin (attempt ${retryCount}/${maxRetries}):`, error.message);
         
         if (retryCount >= maxRetries) {
           throw new Error(`Failed to connect admin after ${maxRetries} attempts: ${error.message}`);
-        }
-        
-        // Wait before retrying (exponential backoff)
-        await new Promise(resolve => setTimeout(resolve, Math.pow(2, retryCount) * 1000));
-      }
-    }
-  }
-
-  /**
-   * Connect analytics consumer with retry logic
-   */
-  private async connectAnalyticsConsumer(): Promise<void> {
-    if (this.isAnalyticsConsumerConnected) return;
-
-    const maxRetries = 3;
-    let retryCount = 0;
-
-    while (retryCount < maxRetries) {
-      try {
-        await this.analyticsConsumer!.connect();
-        this.isAnalyticsConsumerConnected = true;
-        console.log('[KafkaConnectionManager] Analytics consumer connected');
-        return;
-      } catch (error: any) {
-        retryCount++;
-        console.error(`[KafkaConnectionManager] Failed to connect analytics consumer (attempt ${retryCount}/${maxRetries}):`, error.message);
-        
-        if (retryCount >= maxRetries) {
-          throw new Error(`Failed to connect analytics consumer after ${maxRetries} attempts: ${error.message}`);
         }
         
         // Wait before retrying (exponential backoff)
@@ -337,12 +205,8 @@ class KafkaConnectionManager {
   getConnectionStatus() {
     return {
       producer: this.isProducerConnected,
-      consumer: this.isConsumerConnected,
-      analyticsConsumer: this.isAnalyticsConsumerConnected,
       admin: this.isAdminConnected,
       hasProducer: this.producer !== null,
-      hasConsumer: this.consumer !== null,
-      hasAnalyticsConsumer: this.analyticsConsumer !== null,
       hasAdmin: this.admin !== null,
     };
   }
@@ -351,7 +215,7 @@ class KafkaConnectionManager {
    * Graceful shutdown of all connections
    */
   async shutdown(): Promise<void> {
-    console.log('[KafkaConnectionManager] Starting graceful shutdown...');
+    console.log('[ProducerKafkaManager] Starting graceful shutdown...');
     
     const shutdownPromises: Promise<void>[] = [];
 
@@ -359,31 +223,9 @@ class KafkaConnectionManager {
       shutdownPromises.push(
         this.producer.disconnect().then(() => {
           this.isProducerConnected = false;
-          console.log('[KafkaConnectionManager] Producer disconnected');
-        }).catch(err => {
-          console.error('[KafkaConnectionManager] Error disconnecting producer:', err);
-        })
-      );
-    }
-
-    if (this.consumer && this.isConsumerConnected) {
-      shutdownPromises.push(
-        this.consumer.disconnect().then(() => {
-          this.isConsumerConnected = false;
-          console.log('[KafkaConnectionManager] Consumer disconnected');
-        }).catch(err => {
-          console.error('[KafkaConnectionManager] Error disconnecting consumer:', err);
-        })
-      );
-    }
-
-    if (this.analyticsConsumer && this.isAnalyticsConsumerConnected) {
-      shutdownPromises.push(
-        this.analyticsConsumer.disconnect().then(() => {
-          this.isAnalyticsConsumerConnected = false;
-          console.log('[KafkaConnectionManager] Analytics consumer disconnected');
-        }).catch(err => {
-          console.error('[KafkaConnectionManager] Error disconnecting analytics consumer:', err);
+          console.log('[ProducerKafkaManager] Producer disconnected');
+        }).catch((err: any) => {
+          console.error('[ProducerKafkaManager] Error disconnecting producer:', err);
         })
       );
     }
@@ -392,15 +234,15 @@ class KafkaConnectionManager {
       shutdownPromises.push(
         this.admin.disconnect().then(() => {
           this.isAdminConnected = false;
-          console.log('[KafkaConnectionManager] Admin disconnected');
-        }).catch(err => {
-          console.error('[KafkaConnectionManager] Error disconnecting admin:', err);
+          console.log('[ProducerKafkaManager] Admin disconnected');
+        }).catch((err: any) => {
+          console.error('[ProducerKafkaManager] Error disconnecting admin:', err);
         })
       );
     }
 
     await Promise.all(shutdownPromises);
-    console.log('[KafkaConnectionManager] Graceful shutdown completed');
+    console.log('[ProducerKafkaManager] Graceful shutdown completed');
   }
 
   /**
@@ -424,18 +266,18 @@ class KafkaConnectionManager {
 }
 
 // Singleton instance
-const kafkaConnectionManager = new KafkaConnectionManager();
+const producerKafkaManager = new ProducerKafkaConnectionManager();
 
 // Graceful shutdown handling
 process.on('SIGTERM', async () => {
-  console.log('[KafkaConnectionManager] Received SIGTERM, shutting down connections...');
-  await kafkaConnectionManager.shutdown();
+  console.log('[ProducerKafkaManager] Received SIGTERM, shutting down connections...');
+  await producerKafkaManager.shutdown();
 });
 
 process.on('SIGINT', async () => {
-  console.log('[KafkaConnectionManager] Received SIGINT, shutting down connections...');
-  await kafkaConnectionManager.shutdown();
+  console.log('[ProducerKafkaManager] Received SIGINT, shutting down connections...');
+  await producerKafkaManager.shutdown();
 });
 
-export { kafkaConnectionManager };
-export default kafkaConnectionManager;
+export { producerKafkaManager };
+export default producerKafkaManager;

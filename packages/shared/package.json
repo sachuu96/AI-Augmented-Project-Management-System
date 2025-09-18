@@ -1,0 +1,20 @@
+{
+  "name": "@project/shared",
+  "version": "1.0.0",
+  "description": "Shared types, constants, and utilities for microservices",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "zod": "^4.1.5"
+  },
+  "devDependencies": {
+    "typescript": "^5.1.6",
+    "@types/node": "^20.19.13"
+  }
+}
